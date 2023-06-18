@@ -2,14 +2,17 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from starlette import status
 from tablemodels.user import User
-from database.db import dbDependency
+from dependencies.db import dbDependency
+from dependencies.formData import formDataDependency
 from services.auth import hashPassword, findValidUser, createAccessToken
 from typing import Annotated
 from datetime import timedelta
-from fastapi.security import OAuth2PasswordRequestForm
 
 
-router = APIRouter()
+router = APIRouter(
+    prefix='/auth',
+    tags=['auth']
+)
 
 
 class UserIn(BaseModel):
@@ -37,9 +40,11 @@ async def createUser(db: dbDependency, userIn: UserIn):
 
 
 @router.post('/token', status_code=status.HTTP_200_OK, response_model=TokenOut)
-async def getToken(formData: Annotated[OAuth2PasswordRequestForm, Depends()], db: dbDependency):
+async def getToken(formData: formDataDependency, db: dbDependency):
     user = findValidUser(formData.username, formData.password, db)
     if not user:
-        raise HTTPException(status_code=401, detail="Invalid credentials!")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials!")
     token = createAccessToken(user.email, user.id, timedelta(minutes=60))
     return {'access_token': token, 'token_type': 'bearer'}
